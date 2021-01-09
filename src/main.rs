@@ -18,6 +18,7 @@ fn main() {
         .add_system(position_translation.system())
         .add_system(size_scaling.system())
         .add_system(animate_sprite_system.system())
+        // .add_system(flip_sprite_system.system())
         .add_system(pacman_timer.system())
         .add_system(pacman_movement.system())
         .run();
@@ -95,6 +96,22 @@ impl Direction {
             Self::Down => Self::Up,
         }
     }
+    fn quarter_cw(self) -> Self {
+        match self {
+            Self::Left => Self::Up,
+            Self::Right => Self::Down,
+            Self::Up => Self::Right,
+            Self::Down => Self::Left,
+        }
+    }
+    fn quarter_ccw(self) -> Self {
+        match self {
+            Self::Left => Self::Down,
+            Self::Right => Self::Up,
+            Self::Up => Self::Left,
+            Self::Down => Self::Right,
+        }
+    }
 }
 
 struct Pacman {
@@ -155,15 +172,17 @@ fn setup(
             }
         }
     }
+
     let texture_handle = asset_server.load("textures/pacman-sheet.png");
     let texture_atlas = TextureAtlas::from_grid(texture_handle, Vec2::new(20.0, 20.0), 4, 1);
     let texture_atlas_handle = texture_atlases.add(texture_atlas);
     commands
         .spawn(SpriteSheetBundle {
             texture_atlas: texture_atlas_handle,
+            // transform: Transform::from_rotation(Quat::from_rotation_y(90 as f32)),
             ..Default::default()
         })
-        .with(Pacman{direction:Direction::Left})
+        .with(Pacman{direction:Direction::Right})
         .with(Position{x:13 as i32, y:23 as i32})
         .with(Size::square(1.0))
         .with(Timer::from_seconds(0.1, true));
@@ -218,6 +237,21 @@ fn animate_sprite_system(
     }
 }
 
+fn flip_sprite_system(
+    input: Res<Input<KeyCode>>, 
+    mut query: Query<(&TextureAtlasSprite, &mut Transform)>
+) {
+    for (sprite, mut transform) in query.iter_mut() {
+        if input.pressed(KeyCode::Left) {
+            // transform.rotate(Quat::from_rotation_y(0.0));
+            transform.rotate(Quat::from_rotation_y(std::f32::consts::PI));
+        } else if input.pressed(KeyCode::Right) {
+            transform.rotate(Quat::from_rotation_y(0.0));
+            // transform.rotate(Quat::from_rotation_y(std::f32::consts::PI));
+        }
+    }
+}
+
 struct PacmanMoveTimer(Timer);
 
 fn pacman_timer(time: Res<Time>, mut pacman_timer: ResMut<PacmanMoveTimer>) {
@@ -229,12 +263,41 @@ fn pacman_movement(
     pacman_timer: ResMut<PacmanMoveTimer>,
     mut pacmans: Query<(Entity, &mut Pacman)>,
     mut positions: Query<&mut Position>,
+    mut sprites: Query<(&TextureAtlasSprite, &mut Transform)>
 ) {
     if let Some((entity, mut pacman)) = pacmans.iter_mut().next() {
         let mut pos = positions.get_mut(entity).unwrap();
+        let (_, mut transform)= sprites.get_mut(entity).unwrap();
+        let dir: Direction = if keyboard_input.pressed(KeyCode::Left) {
+            Direction::Left
+        } else if keyboard_input.pressed(KeyCode::Down) {
+            Direction::Down
+        } else if keyboard_input.pressed(KeyCode::Up) {
+            Direction::Up
+        } else if keyboard_input.pressed(KeyCode::Right) {
+            Direction::Right
+        } else {
+            pacman.direction
+        };
+
         if !pacman_timer.0.finished() {
             return;
         }
+
+        // logic to `dir` from input here
+        if dir == pacman.direction.opposite() {
+            transform.rotate(Quat::from_rotation_z(std::f32::consts::PI));
+            pacman.direction = dir;
+        } else if dir == pacman.direction.quarter_cw() {
+            // transform.rotate(Quat::from_rotation_y(-1.* std::f32::consts::PI / 2.));
+            transform.rotate(Quat::from_rotation_z(-1. * std::f32::consts::PI / 2.));
+            pacman.direction = dir;
+        } else if dir == pacman.direction.quarter_ccw() {
+            transform.rotate(Quat::from_rotation_z(std::f32::consts::PI / 2.));
+            pacman.direction = dir;
+        }
+
+
         if keyboard_input.pressed(KeyCode::Down) {
             if pos.y + 1 < 31 && WORLD_MAP[(pos.y+1) as usize][pos.x as usize] != 1 {
                 pos.y += 1;
