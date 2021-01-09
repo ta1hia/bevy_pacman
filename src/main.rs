@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use std::cmp::min;
+use std::time::Duration;
 
 
 fn main() {
@@ -10,10 +10,16 @@ fn main() {
             ..Default::default()  // what is up with this syntax?
         })
         .add_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
+        .add_resource(PacmanMoveTimer(Timer::new(
+                    Duration::from_millis(50. as u64),
+                    true,
+        )))
         .add_startup_system(setup.system())
         .add_system(position_translation.system())
         .add_system(size_scaling.system())
         .add_system(animate_sprite_system.system())
+        .add_system(pacman_timer.system())
+        .add_system(pacman_movement.system())
         .run();
 }
 
@@ -24,27 +30,27 @@ const WORLD_MAP: [[i32; 27]; 31] = [
   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
   [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
   [1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1], 
-  [1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1], 
+  [1, 2, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 2, 1],
   [1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1], 
   [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], 
   [1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1], 
-  [1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1], 
+  [1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1],
   [1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1], 
   [1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1], 
-  [2, 2, 2, 2, 2, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 2, 2, 2, 2, 2], 
-  [2, 2, 2, 2, 2, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 2, 2, 2, 2, 2], 
-  [2, 2, 2, 2, 2, 1, 0, 1, 1, 0, 1, 1, 1, 3, 1, 1, 1, 0, 1, 1, 0, 1, 2, 2, 2, 2, 2], 
+  [9, 9, 9, 9, 9, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 9, 9, 9, 9, 9], 
+  [9, 9, 9, 9, 9, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 9, 9, 9, 9, 9], 
+  [9, 9, 9, 9, 9, 1, 0, 1, 1, 0, 1, 1, 1, 3, 1, 1, 1, 0, 1, 1, 0, 1, 9, 9, 9, 9, 9], 
   [1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 3, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1], 
-  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 
+  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 9, 9, 9, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 
   [1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1], 
-  [2, 2, 2, 2, 2, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 2, 2, 2, 2, 2], 
-  [2, 2, 2, 2, 2, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 2, 2, 2, 2, 2], 
-  [2, 2, 2, 2, 2, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 2, 2, 2, 2, 2], 
+  [9, 9, 9, 9, 9, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 9, 9, 9, 9, 9], 
+  [9, 9, 9, 9, 9, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 9, 9, 9, 9, 9], 
+  [9, 9, 9, 9, 9, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 9, 9, 9, 9, 9], 
   [1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1], 
   [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], 
   [1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1], 
   [1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1], 
-  [1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1], 
+  [1, 2, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 2, 1], 
   [1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1], 
   [1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1], 
   [1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1], 
@@ -54,41 +60,7 @@ const WORLD_MAP: [[i32; 27]; 31] = [
   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
 ];
 
-// const WORLD_MAP: [[i32; 29]; 31] = [
-//   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 ,1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-//   [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 ,1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-//   [1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1 ,1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1], 
-//   [1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1 ,1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1], 
-//   [1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1 ,1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1], 
-//   [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ,0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], 
-//   [1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1 ,1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1], 
-//   [1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1 ,1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1], 
-//   [1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1 ,1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1], 
-//   [1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1 ,1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1], 
-//   [0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1 ,1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0], 
-//   [0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0 ,0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0], 
-//   [0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 1, 1, 1 ,1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0], 
-//   [1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1 ,1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1], 
-//   [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0 ,0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 
-//   [1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1 ,1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1], 
-//   [0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 1, 1, 1 ,1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0], 
-//   [0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0 ,0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0], 
-//   [0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 1, 1, 1 ,1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0], 
-//   [1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1 ,1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1], 
-//   [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 ,1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], 
-//   [1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1 ,1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1], 
-//   [1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1 ,1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1], 
-//   [1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0 ,0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1], 
-//   [1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1 ,1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1], 
-//   [1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1 ,1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1], 
-//   [1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1 ,1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1], 
-//   [1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1 ,1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1], 
-//   [1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1 ,1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1], 
-//   [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ,0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-//   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 ,1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-// ];
-
-#[derive(Default, Copy, Clone, Eq, PartialEq, Hash)] // what the hell is this
+#[derive(Default, Copy, Clone, Eq, PartialEq, Hash)] 
 struct Position {
     x: i32,
     y: i32,
@@ -107,6 +79,28 @@ impl Size {
     }
 }
 
+#[derive(PartialEq, Copy, Clone)]
+enum Direction {
+    Left,
+    Up,
+    Right,
+    Down,
+}
+impl Direction {
+    fn opposite(self) -> Self {
+        match self {
+            Self::Left => Self::Right,
+            Self::Right => Self::Left,
+            Self::Up => Self::Down,
+            Self::Down => Self::Up,
+        }
+    }
+}
+
+struct Pacman {
+    direction: Direction,
+}
+
 fn setup(
     commands: &mut Commands,
     asset_server: Res<AssetServer>,
@@ -122,18 +116,11 @@ fn setup(
     
     let wall_material = materials.add(Color::rgb(0.2, 0.6, 1.0).into());
     let food_material = materials.add(Color::rgb(1.0, 1.0, 1.0).into());
+    let energy_material = materials.add(Color::rgb(1.0, 1.0, 1.0).into());
     let gate_material = materials.add(Color::rgb(0.5, 0.5, 0.5).into());
     for i in 0..31 {
         for j in 0..27 {
-            if WORLD_MAP[i][j] == 1 {
-                commands
-                    .spawn(SpriteBundle {
-                        material: wall_material.clone(),
-                        ..Default::default()
-                    })
-                    .with(Position{x:i as i32, y:j as i32})
-                    .with(Size::square(1.0));
-            } else if WORLD_MAP[i][j] == 0 {
+            if WORLD_MAP[i][j] == 0 {
                 commands
                     .spawn(SpriteBundle {
                         material: food_material.clone(),
@@ -141,6 +128,22 @@ fn setup(
                     })
                     .with(Position{x:i as i32, y:j as i32})
                     .with(Size::square(0.1));
+            } else if WORLD_MAP[i][j] == 1 {
+                commands
+                    .spawn(SpriteBundle {
+                        material: wall_material.clone(),
+                        ..Default::default()
+                    })
+                    .with(Position{x:i as i32, y:j as i32})
+                    .with(Size::square(1.0));
+            } else if WORLD_MAP[i][j] == 2 {
+                commands
+                    .spawn(SpriteBundle {
+                        material: energy_material.clone(),
+                        ..Default::default()
+                    })
+                    .with(Position{x:i as i32, y:j as i32})
+                    .with(Size::square(0.4));
             } else if WORLD_MAP[i][j] == 3 {
                 commands
                     .spawn(SpriteBundle {
@@ -160,40 +163,30 @@ fn setup(
             texture_atlas: texture_atlas_handle,
             ..Default::default()
         })
+        .with(Pacman{direction:Direction::Left})
         .with(Position{x:23 as i32, y:13 as i32})
         .with(Size::square(1.0))
         .with(Timer::from_seconds(0.1, true));
 }
 
-// fn translation(x: i32, y: i32) -> (i32, i32) {
-//     let (mut x2, y2): (i32, i32);
-//     if x < ARENA_WIDTH/2  {
-//         x2 = ((ARENA_WIDTH/2 - x ) * 20  + (20/2)) 
-//     } else {
-//         x2 = ((x - ARENA_WIDTH/2) * 20  - (20/2))  * -1
-//     }
-//     if y < ARENA_HEIGHT/2  {
-//         y2 = ((ARENA_HEIGHT/2 - y ) * 20  + (20/2)) 
-//     } else {
-//         y2 = ((y - ARENA_HEIGHT/2) * 20  - (20/2))  * -1
-//     }
-//     (x2, y2)
-// }
+fn translation(x: i32, y: i32) -> (i32, i32) {
+    let (mut x2, y2): (i32, i32);
+    if x < ARENA_WIDTH/2  {
+        x2 = ((ARENA_WIDTH/2 - x ) * 20  + (20/2)) 
+    } else {
+        x2 = ((x - ARENA_WIDTH/2) * 20  - (20/2))  * -1
+    }
+    if y < ARENA_HEIGHT/2  {
+        y2 = ((ARENA_HEIGHT/2 - y ) * 20  + (20/2)) 
+    } else {
+        y2 = ((y - ARENA_HEIGHT/2) * 20  - (20/2))  * -1
+    }
+    (x2, y2)
+}
 
-fn position_translation(windows: Res<Windows>, mut q: Query<(&Position, &mut Transform)>) {
-    let window = windows.get_primary().unwrap();
+fn position_translation(mut q: Query<(&Position, &mut Transform)>) {
     for (pos, mut transform) in q.iter_mut() {
-        let (mut x, y): (i32, i32);
-        if pos.x < ARENA_WIDTH/2  {
-            x = ((ARENA_WIDTH/2 - pos.x ) * 20  + (20/2)) 
-        } else {
-            x = ((pos.x - ARENA_WIDTH/2) * 20  - (20/2))  * -1
-        }
-        if pos.y < ARENA_HEIGHT/2  {
-            y = ((ARENA_HEIGHT/2 - pos.y ) * 20  + (20/2)) 
-        } else {
-            y = ((pos.y - ARENA_HEIGHT/2) * 20  - (20/2))  * -1
-        }
+        let (x, y): (i32, i32) = translation(pos.x, pos.y);
         transform.translation = Vec3::new(
             y as f32,
             x as f32,
@@ -202,8 +195,7 @@ fn position_translation(windows: Res<Windows>, mut q: Query<(&Position, &mut Tra
     }
 }
 
-fn size_scaling(windows: Res<Windows>, mut q: Query<(&Size, &mut Sprite)>) {
-    let window = windows.get_primary().unwrap();  // unwrap?
+fn size_scaling(mut q: Query<(&Size, &mut Sprite)>) {
     for (sprite_size, mut sprite) in q.iter_mut() {
         sprite.size = Vec2::new(
             20 as f32 *sprite_size.width ,
@@ -222,6 +214,47 @@ fn animate_sprite_system(
         if timer.finished() {
             let texture_atlas = texture_atlases.get(texture_atlas_handle).unwrap();
             sprite.index = ((sprite.index as usize + 1) % texture_atlas.textures.len()) as u32;
+        }
+    }
+}
+
+struct PacmanMoveTimer(Timer);
+
+fn pacman_timer(time: Res<Time>, mut pacman_timer: ResMut<PacmanMoveTimer>) {
+    pacman_timer.0.tick(time.delta_seconds());
+}
+// }
+
+fn pacman_movement(
+    keyboard_input: Res<Input<KeyCode>>,
+    pacman_timer: ResMut<PacmanMoveTimer>,
+    mut pacmans: Query<(Entity, &mut Pacman)>,
+    mut positions: Query<&mut Position>,
+) {
+    if let Some((entity, mut pacman)) = pacmans.iter_mut().next() {
+        let mut pos = positions.get_mut(entity).unwrap();
+        if !pacman_timer.0.finished() {
+            return;
+        }
+        if keyboard_input.pressed(KeyCode::Left) {
+            if pos.y + 1 < 27 && WORLD_MAP[pos.x as usize][(pos.y+1) as usize] != 1 {
+                pos.y += 1;
+            }
+        }
+        if keyboard_input.pressed(KeyCode::Right) {
+            if pos.y - 1 > -1 && WORLD_MAP[pos.x as usize][(pos.y-1) as usize] != 1 {
+                pos.y -= 1;
+            }
+        }
+        if keyboard_input.pressed(KeyCode::Down) {
+            if pos.x + 1 < 31 && WORLD_MAP[(pos.x+1) as usize][pos.y as usize] != 1 {
+                pos.x += 1;
+            }
+        }
+        if keyboard_input.pressed(KeyCode::Up) {
+            if pos.x - 1 > -1 && WORLD_MAP[(pos.x-1) as usize][pos.y as usize] != 1 {
+                pos.x -= 1;
+            }
         }
     }
 }
