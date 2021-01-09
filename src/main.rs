@@ -11,7 +11,7 @@ fn main() {
         })
         .add_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
         .add_resource(PacmanMoveTimer(Timer::new(
-                    Duration::from_millis(50. as u64),
+                    Duration::from_millis(1. as u64),
                     true,
         )))
         .add_startup_system(setup.system())
@@ -20,6 +20,8 @@ fn main() {
         .add_system(animate_sprite_system.system())
         .add_system(pacman_timer.system())
         .add_system(pacman_movement.system())
+        .add_system(pacman_eating.system())
+        .add_system(pacman_energy_boost.system())
         .run();
 }
 
@@ -115,7 +117,12 @@ impl Direction {
 
 struct Pacman {
     direction: Direction,
+    last: Position,
 }
+
+struct Food {}
+struct Energy {}
+
 
 fn setup(
     commands: &mut Commands,
@@ -142,6 +149,7 @@ fn setup(
                         material: food_material.clone(),
                         ..Default::default()
                     })
+                    .with(Food{})
                     .with(Position{x:i as i32, y:j as i32})
                     .with(Size::square(0.1));
             } else if WORLD_MAP[j][i] == 1 {
@@ -158,6 +166,7 @@ fn setup(
                         material: energy_material.clone(),
                         ..Default::default()
                     })
+                    .with(Energy{})
                     .with(Position{x:i as i32, y:j as i32})
                     .with(Size::square(0.4));
             } else if WORLD_MAP[j][i] == 3 {
@@ -181,7 +190,7 @@ fn setup(
             // transform: Transform::from_rotation(Quat::from_rotation_y(90 as f32)),
             ..Default::default()
         })
-        .with(Pacman{direction:Direction::Right})
+        .with(Pacman{direction:Direction::Right, last: Position{x:13 as i32, y:23 as i32}})
         .with(Position{x:13 as i32, y:23 as i32})
         .with(Size::square(1.0))
         .with(Timer::from_seconds(0.1, true));
@@ -279,7 +288,7 @@ fn pacman_movement(
             pacman.direction = dir;
         }
 
-
+        pacman.last = *pos;
         if keyboard_input.pressed(KeyCode::Down) {
             if pos.y + 1 < 31 && WORLD_MAP[(pos.y+1) as usize][pos.x as usize] != 1 {
                 pos.y += 1;
@@ -302,6 +311,35 @@ fn pacman_movement(
                 pos.x -= 1;
             } else if pos.y == 14 && pos.x - 1 == -1 {
                 pos.x = 26
+            }
+        }
+    }
+}
+
+fn pacman_eating(
+    commands: &mut Commands,
+    foods: Query<(Entity, &Position), With<Food>>,
+    pacmans: Query<(Entity, &Pacman)>, 
+){
+    if let Some((entity, pacman)) = pacmans.iter().next() {
+        for (ent, food_pos) in foods.iter() {
+            if food_pos == &pacman.last {
+                commands.despawn(ent);
+            }
+        }
+    }
+}
+
+fn pacman_energy_boost(
+    commands: &mut Commands,
+    foods: Query<(Entity, &Position), With<Energy>>,
+    pacmans: Query<(Entity, &Pacman)>, 
+){
+    if let Some((entity, pacman)) = pacmans.iter().next() {
+        for (ent, food_pos) in foods.iter() {
+            if food_pos == &pacman.last {
+                commands.despawn(ent);
+                // trigger ghost scatter mode
             }
         }
     }
