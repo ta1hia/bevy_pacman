@@ -7,7 +7,7 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_resource(WindowDescriptor{  // https://docs.rs/bevy/0.3.0/bevy/prelude/struct.WindowDescriptor.html
             title: "pacman".to_string(),
-            ..Default::default()  // what is up with this syntax?
+            ..Default::default()  
         })
         .add_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
         .add_resource(PacmanMoveTimer(Timer::new(
@@ -118,9 +118,9 @@ fn setup(
     let food_material = materials.add(Color::rgb(1.0, 1.0, 1.0).into());
     let energy_material = materials.add(Color::rgb(1.0, 1.0, 1.0).into());
     let gate_material = materials.add(Color::rgb(0.5, 0.5, 0.5).into());
-    for i in 0..31 {
-        for j in 0..27 {
-            if WORLD_MAP[i][j] == 0 {
+    for j in 0..31 {
+        for i in 0..27 {
+            if WORLD_MAP[j][i] == 0 {
                 commands
                     .spawn(SpriteBundle {
                         material: food_material.clone(),
@@ -128,7 +128,7 @@ fn setup(
                     })
                     .with(Position{x:i as i32, y:j as i32})
                     .with(Size::square(0.1));
-            } else if WORLD_MAP[i][j] == 1 {
+            } else if WORLD_MAP[j][i] == 1 {
                 commands
                     .spawn(SpriteBundle {
                         material: wall_material.clone(),
@@ -136,7 +136,7 @@ fn setup(
                     })
                     .with(Position{x:i as i32, y:j as i32})
                     .with(Size::square(1.0));
-            } else if WORLD_MAP[i][j] == 2 {
+            } else if WORLD_MAP[j][i] == 2 {
                 commands
                     .spawn(SpriteBundle {
                         material: energy_material.clone(),
@@ -144,7 +144,7 @@ fn setup(
                     })
                     .with(Position{x:i as i32, y:j as i32})
                     .with(Size::square(0.4));
-            } else if WORLD_MAP[i][j] == 3 {
+            } else if WORLD_MAP[j][i] == 3 {
                 commands
                     .spawn(SpriteBundle {
                         material: gate_material.clone(),
@@ -164,7 +164,7 @@ fn setup(
             ..Default::default()
         })
         .with(Pacman{direction:Direction::Left})
-        .with(Position{x:23 as i32, y:13 as i32})
+        .with(Position{x:13 as i32, y:23 as i32})
         .with(Size::square(1.0))
         .with(Timer::from_seconds(0.1, true));
 }
@@ -172,14 +172,14 @@ fn setup(
 fn translation(x: i32, y: i32) -> (i32, i32) {
     let (mut x2, y2): (i32, i32);
     if x < ARENA_WIDTH/2  {
-        x2 = ((ARENA_WIDTH/2 - x ) * 20  + (20/2)) 
+        x2 = ((ARENA_WIDTH/2 - x ) * 20  + (20/2))  * -1
     } else {
-        x2 = ((x - ARENA_WIDTH/2) * 20  - (20/2))  * -1
+        x2 = ((x - ARENA_WIDTH/2) * 20  - (20/2))  
     }
     if y < ARENA_HEIGHT/2  {
         y2 = ((ARENA_HEIGHT/2 - y ) * 20  + (20/2)) 
     } else {
-        y2 = ((y - ARENA_HEIGHT/2) * 20  - (20/2))  * -1
+        y2 = ((y - ARENA_HEIGHT/2) * 20  - (20/2)) * -1
     }
     (x2, y2)
 }
@@ -188,8 +188,8 @@ fn position_translation(mut q: Query<(&Position, &mut Transform)>) {
     for (pos, mut transform) in q.iter_mut() {
         let (x, y): (i32, i32) = translation(pos.x, pos.y);
         transform.translation = Vec3::new(
-            y as f32,
             x as f32,
+            y as f32,
             0.0,
         );
     }
@@ -223,7 +223,6 @@ struct PacmanMoveTimer(Timer);
 fn pacman_timer(time: Res<Time>, mut pacman_timer: ResMut<PacmanMoveTimer>) {
     pacman_timer.0.tick(time.delta_seconds());
 }
-// }
 
 fn pacman_movement(
     keyboard_input: Res<Input<KeyCode>>,
@@ -236,23 +235,23 @@ fn pacman_movement(
         if !pacman_timer.0.finished() {
             return;
         }
-        if keyboard_input.pressed(KeyCode::Left) {
-            if pos.y + 1 < 27 && WORLD_MAP[pos.x as usize][(pos.y+1) as usize] != 1 {
+        if keyboard_input.pressed(KeyCode::Down) {
+            if pos.y + 1 < 31 && WORLD_MAP[(pos.y+1) as usize][pos.x as usize] != 1 {
                 pos.y += 1;
             }
         }
-        if keyboard_input.pressed(KeyCode::Right) {
-            if pos.y - 1 > -1 && WORLD_MAP[pos.x as usize][(pos.y-1) as usize] != 1 {
+        if keyboard_input.pressed(KeyCode::Up) {
+            if pos.y - 1 > -1 && WORLD_MAP[(pos.y-1) as usize][pos.x as usize] != 1 {
                 pos.y -= 1;
             }
         }
-        if keyboard_input.pressed(KeyCode::Down) {
-            if pos.x + 1 < 31 && WORLD_MAP[(pos.x+1) as usize][pos.y as usize] != 1 {
+        if keyboard_input.pressed(KeyCode::Right) {
+            if pos.x + 1 < 27 && WORLD_MAP[pos.y as usize][(pos.x+1) as usize] != 1 {
                 pos.x += 1;
             }
         }
-        if keyboard_input.pressed(KeyCode::Up) {
-            if pos.x - 1 > -1 && WORLD_MAP[(pos.x-1) as usize][pos.y as usize] != 1 {
+        if keyboard_input.pressed(KeyCode::Left) {
+            if pos.x - 1 > -1 && WORLD_MAP[pos.y as usize][(pos.x-1) as usize] != 1 {
                 pos.x -= 1;
             }
         }
