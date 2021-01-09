@@ -18,7 +18,6 @@ fn main() {
         .add_system(position_translation.system())
         .add_system(size_scaling.system())
         .add_system(animate_sprite_system.system())
-        // .add_system(flip_sprite_system.system())
         .add_system(pacman_timer.system())
         .add_system(pacman_movement.system())
         .run();
@@ -189,14 +188,14 @@ fn setup(
 }
 
 fn translation(x: i32, y: i32) -> (i32, i32) {
-    let (mut x2, y2): (i32, i32);
+    let (x2, y2): (i32, i32);
     if x < ARENA_WIDTH/2  {
         x2 = ((ARENA_WIDTH/2 - x ) * 20  + (20/2))  * -1
     } else {
-        x2 = ((x - ARENA_WIDTH/2) * 20  - (20/2))  
+        x2 = (x - ARENA_WIDTH/2) * 20  - (20/2)
     }
     if y < ARENA_HEIGHT/2  {
-        y2 = ((ARENA_HEIGHT/2 - y ) * 20  + (20/2)) 
+        y2 = (ARENA_HEIGHT/2 - y ) * 20  + (20/2)
     } else {
         y2 = ((y - ARENA_HEIGHT/2) * 20  - (20/2)) * -1
     }
@@ -237,21 +236,6 @@ fn animate_sprite_system(
     }
 }
 
-fn flip_sprite_system(
-    input: Res<Input<KeyCode>>, 
-    mut query: Query<(&TextureAtlasSprite, &mut Transform)>
-) {
-    for (sprite, mut transform) in query.iter_mut() {
-        if input.pressed(KeyCode::Left) {
-            // transform.rotate(Quat::from_rotation_y(0.0));
-            transform.rotate(Quat::from_rotation_y(std::f32::consts::PI));
-        } else if input.pressed(KeyCode::Right) {
-            transform.rotate(Quat::from_rotation_y(0.0));
-            // transform.rotate(Quat::from_rotation_y(std::f32::consts::PI));
-        }
-    }
-}
-
 struct PacmanMoveTimer(Timer);
 
 fn pacman_timer(time: Res<Time>, mut pacman_timer: ResMut<PacmanMoveTimer>) {
@@ -284,12 +268,10 @@ fn pacman_movement(
             return;
         }
 
-        // logic to `dir` from input here
         if dir == pacman.direction.opposite() {
             transform.rotate(Quat::from_rotation_z(std::f32::consts::PI));
             pacman.direction = dir;
         } else if dir == pacman.direction.quarter_cw() {
-            // transform.rotate(Quat::from_rotation_y(-1.* std::f32::consts::PI / 2.));
             transform.rotate(Quat::from_rotation_z(-1. * std::f32::consts::PI / 2.));
             pacman.direction = dir;
         } else if dir == pacman.direction.quarter_ccw() {
@@ -311,11 +293,15 @@ fn pacman_movement(
         if keyboard_input.pressed(KeyCode::Right) {
             if pos.x + 1 < 27 && WORLD_MAP[pos.y as usize][(pos.x+1) as usize] != 1 {
                 pos.x += 1;
+            } else if pos.y == 14 && pos.x + 1 == 27 {
+                pos.x = 0
             }
         }
         if keyboard_input.pressed(KeyCode::Left) {
             if pos.x - 1 > -1 && WORLD_MAP[pos.y as usize][(pos.x-1) as usize] != 1 {
                 pos.x -= 1;
+            } else if pos.y == 14 && pos.x - 1 == -1 {
+                pos.x = 26
             }
         }
     }
