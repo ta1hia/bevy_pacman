@@ -15,6 +15,7 @@ fn main() {
                     true,
         )))
         .add_startup_system(setup.system())
+        .add_startup_system(ghost_setup.system())
         .add_system(position_translation.system())
         .add_system(size_scaling.system())
         .add_system(animate_sprite_system.system())
@@ -194,6 +195,69 @@ fn setup(
         .with(Position{x:13 as i32, y:23 as i32})
         .with(Size::square(1.0))
         .with(Timer::from_seconds(0.1, true));
+}
+
+fn ghost_setup(
+    commands: &mut Commands,
+    asset_server: Res<AssetServer>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+    mut texture_atlases: ResMut<Assets<TextureAtlas>>,
+) {
+    commands
+        .spawn(Camera2dBundle::default())
+        .spawn(LightBundle {
+            transform: Transform::from_translation(Vec3::new(4.0, 8.0, 4.0)),
+            ..Default::default()
+        });
+    
+
+    let pink_texture = asset_server.load("textures/pinkghost-sheet.png");
+    let pink_atlas = TextureAtlas::from_grid(pink_texture, Vec2::new(20.0, 20.0), 4, 1);
+    let pink_atlas_handle = texture_atlases.add(pink_atlas);
+    commands
+        .spawn(SpriteSheetBundle {
+            texture_atlas: pink_atlas_handle,
+            // transform: Transform::from_rotation(Quat::from_rotation_y(90 as f32)),
+            ..Default::default()
+        })
+        .with(Position{x:13 as i32, y:14 as i32})
+        .with(Size::square(1.0));
+
+    let blue_texture = asset_server.load("textures/blueghost-sheet.png");
+    let blue_atlas = TextureAtlas::from_grid(blue_texture, Vec2::new(20.0, 20.0), 4, 1);
+    let blue_atlas_handle = texture_atlases.add(blue_atlas);
+    commands
+        .spawn(SpriteSheetBundle {
+            texture_atlas: blue_atlas_handle,
+            // transform: Transform::from_rotation(Quat::from_rotation_y(90 as f32)),
+            ..Default::default()
+        })
+        .with(Position{x:12 as i32, y:14 as i32})
+        .with(Size::square(1.0));
+
+    let orange_texture = asset_server.load("textures/orangeghost-sheet.png");
+    let orange_atlas = TextureAtlas::from_grid(orange_texture, Vec2::new(20.0, 20.0), 4, 1);
+    let orange_atlas_handle = texture_atlases.add(orange_atlas);
+    commands
+        .spawn(SpriteSheetBundle {
+            texture_atlas: orange_atlas_handle,
+            // transform: Transform::from_rotation(Quat::from_rotation_y(90 as f32)),
+            ..Default::default()
+        })
+        .with(Position{x:14 as i32, y:14 as i32})
+        .with(Size::square(1.0));
+
+    let red_texture = asset_server.load("textures/redghost-sheet.png");
+    let red_atlas = TextureAtlas::from_grid(red_texture, Vec2::new(20.0, 20.0), 4, 1);
+    let red_atlas_handle = texture_atlases.add(red_atlas);
+    commands
+        .spawn(SpriteSheetBundle {
+            texture_atlas: red_atlas_handle,
+            // transform: Transform::from_rotation(Quat::from_rotation_y(90 as f32)),
+            ..Default::default()
+        })
+        .with(Position{x:13 as i32, y:11 as i32})
+        .with(Size::square(1.0));
 }
 
 fn translation(x: i32, y: i32) -> (i32, i32) {
