@@ -1,5 +1,5 @@
 [package]
-name = "pacboi"
+name = "pacman"
 version = "0.1.0"
 authors = ["tk <tahia.khan@gmail.com>"]
 edition = "2018"
@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 bevy = "0.4.0"
+rand = "0.8.1"

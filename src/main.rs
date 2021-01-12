@@ -2,6 +2,10 @@ use bevy::prelude::*;
 use std::time::Duration;
 
 
+use rand::seq::SliceRandom; 
+
+
+
 fn main() {
     App::build()
         .add_plugins(DefaultPlugins)
@@ -14,10 +18,10 @@ fn main() {
                     Duration::from_millis(1. as u64),
                     true,
         )))
-        // .add_resource(GhostModeTimer(Timer::new(
-        //             Duration::from_millis(10000. as u64),
-        //             true,
-        // )))
+        .add_resource(GhostModeTimer(Timer::new(
+                    Duration::from_millis(10000. as u64),
+                    true,
+        )))
         .add_startup_system(setup.system())
         .add_startup_system(ghost_setup.system())
         .add_system(position_translation.system())
@@ -28,6 +32,8 @@ fn main() {
         .add_system(pacman_eating.system())
         .add_system(pacman_energy_boost.system())
         .add_system(ghost_movement.system())
+        .add_system(ghost_animate.system())
+        .add_system(ghost_mode_timer.system())
         .run();
 }
 
@@ -197,9 +203,22 @@ struct Energy {}
 
 #[derive(PartialEq, Copy, Clone)]
 enum Mode {
-    Chase,
+    Chase1,
+    Chase2,
     Scatter,
     Scared,
+}
+impl Mode {
+    fn next(self) -> Self {
+        let vs = vec![Self::Chase1, Self::Scatter];
+
+        match self {
+            Self::Chase1 => Self::Chase2,
+            Self::Chase2 => Self::Scatter,
+            Self::Scatter => Self::Chase1,
+            Self::Scared => *vs.choose(&mut rand::thread_rng()).unwrap(),
+        }
+    }
 }
 
 // struct RedGhost {
@@ -421,12 +440,19 @@ fn pacman_animate(
 }
 
 struct SpriteMovementTimer(Timer);
-
 fn sprite_timer(
     time: Res<Time>, 
     mut sprite_timer: ResMut<SpriteMovementTimer>
 ) {
     sprite_timer.0.tick(time.delta_seconds());
+}
+
+struct GhostModeTimer(Timer);
+fn ghost_mode_timer(
+    time: Res<Time>, 
+    mut ghost_mode_timer: ResMut<GhostModeTimer>
+) {
+    ghost_mode_timer.0.tick(time.delta_seconds());
 }
 
 fn pacman_eating(
@@ -524,6 +550,11 @@ fn pacman_movement(
     }
 }
 
+fn ghost_next_move(
+    mut ghost: Query<(Entity, &mut Ghost)>,
+) {
+}
+
 fn ghost_movement(
     keyboard_input: Res<Input<KeyCode>>,
     pacman_timer: ResMut<SpriteMovementTimer>,
@@ -546,11 +577,26 @@ fn ghost_movement(
             ghost.target = Position{x:1, y:1}
         }
 
-        // if next_tile == Position{x:}
-        
+
         //get next move
         pos.x = next_tile.x;
         pos.y = next_tile.y;
+    }
+}
+
+
+
+fn ghost_animate(
+    texture_atlases: Res<Assets<TextureAtlas>>,
+    mut query: Query<(&Ghost, &mut TextureAtlasSprite)>,
+) {
+    for (ghost, mut sprite) in query.iter_mut() {
+        match ghost.direction {
+            Direction::Left => sprite.index = 0,
+            Direction::Up => sprite.index = 1,
+            Direction::Right => sprite.index = 2,
+            Direction::Down => sprite.index = 3,
+        }
     }
 }
 
