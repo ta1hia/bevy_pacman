@@ -22,6 +22,7 @@ fn main() {
                     Duration::from_millis(10000. as u64),
                     true,
         )))
+        .add_resource(Game{mode:Mode::Scatter})
         .add_startup_system(setup.system())
         .add_startup_system(ghost_setup.system())
         .add_system(position_translation.system())
@@ -34,6 +35,8 @@ fn main() {
         .add_system(ghost_movement.system())
         .add_system(ghost_animate.system())
         .add_system(ghost_mode_timer.system())
+        .add_system(ghost_mode.system())
+        .add_system(ghost_next_target.system())
         .run();
 }
 
@@ -90,7 +93,7 @@ impl Position {
 	let mut shortest: f32 = 99999.;
         let mut dir: Direction = direction;
         //up
-        if self.y-1 > 0 && 
+        if self.y-1 > -1 && 
             direction != Direction::Down &&
             WORLD_MAP[(self.y-1) as usize][self.x as usize] != 1 {
             let distance = target.euclid_distance(self.x, self.y-1);
@@ -101,7 +104,7 @@ impl Position {
             }
 	}		
         //left
-        if self.x-1 > 0 && 
+        if self.x-1 > -1 && 
             direction != Direction::Right &&
             WORLD_MAP[self.y as usize][(self.x-1) as usize] != 1 {
             let distance = target.euclid_distance(self.x-1, self.y);
@@ -128,7 +131,6 @@ impl Position {
             WORLD_MAP[self.y as usize][(self.x+1) as usize] != 1 {
             let distance = target.euclid_distance(self.x+1, self.y);
             if distance < shortest {
-                shortest = distance;
                 tile = Position{x:self.x+1, y:self.y};
                 dir = Direction::Right;
             }
@@ -201,7 +203,11 @@ impl Ghost {
 struct Food {}
 struct Energy {}
 
-#[derive(PartialEq, Copy, Clone)]
+struct Game{
+    mode: Mode,
+}
+
+#[derive(PartialEq, Copy, Clone, Debug)]
 enum Mode {
     Chase1,
     Chase2,
@@ -323,7 +329,6 @@ fn setup(
 fn ghost_setup(
     commands: &mut Commands,
     asset_server: Res<AssetServer>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
 ) {
     commands
@@ -455,6 +460,26 @@ fn ghost_mode_timer(
     ghost_mode_timer.0.tick(time.delta_seconds());
 }
 
+// use std::fmt;
+
+// impl fmt::Display for Mode {
+//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//             write!(f, "{:?}", self)
+//         }
+// }
+
+fn ghost_mode(
+    mut game: ResMut<Game>,
+    ghost_mode_timer: ResMut<GhostModeTimer>,
+){
+    if !ghost_mode_timer.0.finished() {
+        return;
+    }
+    game.mode = game.mode.next();
+    println!("Mode is {:?}", game.mode);
+}
+
+
 fn pacman_eating(
     commands: &mut Commands,
     foods: Query<(Entity, &Position), With<Food>>,
@@ -471,14 +496,15 @@ fn pacman_eating(
 
 fn pacman_energy_boost(
     commands: &mut Commands,
+    // game: ResMut<Game>,
     foods: Query<(Entity, &Position), With<Energy>>,
     pacmans: Query<(Entity, &Pacman)>, 
 ){
-    if let Some((entity, pacman)) = pacmans.iter().next() {
+    if let Some((_, pacman)) = pacmans.iter().next() {
         for (ent, food_pos) in foods.iter() {
             if food_pos == &pacman.last {
                 commands.despawn(ent);
-                // trigger ghost scatter mode
+                // game.mode = Mode::Scared;
             }
         }
     }
@@ -550,13 +576,31 @@ fn pacman_movement(
     }
 }
 
-fn ghost_next_move(
+
+fn ghost_next_target(
+    game: ResMut<Game>,
     mut ghost: Query<(Entity, &mut Ghost)>,
+    pacmans: Query<(Entity, &Pacman)>,
+    pacman_timer: ResMut<SpriteMovementTimer>,
+    positions: Query<&Position>,
 ) {
+    if let Some((entity, mut ghost)) = ghost.iter_mut().next() {
+        let pos = positions.get(entity).unwrap();   
+        if !pacman_timer.0.finished() {
+            return;
+        }
+        if game.mode == Mode::Scatter {
+            ghost.target = Position{x:1, y:1}
+        }
+        if game.mode == Mode::Chase1 || game.mode == Mode::Chase2 {
+            if let Some((pacman_entity, _)) = pacmans.iter().next() {
+                ghost.target = *positions.get(pacman_entity).unwrap();
+            }
+        }
+    }
 }
 
 fn ghost_movement(
-    keyboard_input: Res<Input<KeyCode>>,
     pacman_timer: ResMut<SpriteMovementTimer>,
     mut ghost: Query<(Entity, &mut Ghost)>,
     mut positions: Query<&mut Position>,
@@ -564,30 +608,26 @@ fn ghost_movement(
 ) {
     if let Some((entity, mut ghost)) = ghost.iter_mut().next() {
         let mut pos = positions.get_mut(entity).unwrap();   // when would i retrieve pacman like this vs querying directly in `sprites`?
-	// is it time to move
         if !pacman_timer.0.finished() {
             return;
         }
         let (next_tile, next_dir) = pos.choose_next_tile(ghost.direction, ghost.target);
         ghost.direction = next_dir;
-        // where should i put this
-        if next_tile == (Position{x:1, y:1}) {
-            ghost.target = Position{x:6, y:5}
-        } else if next_tile == (Position{x:6, y:5}) {
-            ghost.target = Position{x:1, y:1}
+
+        if next_tile.y == 14 && next_tile.x + 1 == 27 {
+            pos.x = 0
+        } else if next_tile.y == 14 && next_tile.x -1 == -1 {
+            pos.x = 26
+        } else {
+            pos.x = next_tile.x;
+            pos.y = next_tile.y;
         }
 
-
-        //get next move
-        pos.x = next_tile.x;
-        pos.y = next_tile.y;
     }
 }
 
 
-
 fn ghost_animate(
-    texture_atlases: Res<Assets<TextureAtlas>>,
     mut query: Query<(&Ghost, &mut TextureAtlasSprite)>,
 ) {
     for (ghost, mut sprite) in query.iter_mut() {
