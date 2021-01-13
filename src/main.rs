@@ -1,21 +1,23 @@
 use bevy::prelude::*;
 use std::time::Duration;
 
-
 use rand::seq::SliceRandom; 
-
 
 
 fn main() {
     App::build()
         .add_plugins(DefaultPlugins)
-        .add_resource(WindowDescriptor{  // https://docs.rs/bevy/0.3.0/bevy/prelude/struct.WindowDescriptor.html
+        .add_resource(WindowDescriptor{  
             title: "pacman".to_string(),
             ..Default::default()  
         })
         .add_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
-        .add_resource(SpriteMovementTimer(Timer::new(
+        .add_resource(PacmanMovementTimer(Timer::new(
                     Duration::from_millis(1. as u64),
+                    true,
+        )))
+        .add_resource(GhostMovementTimer(Timer::new(
+                    Duration::from_millis(100. as u64),
                     true,
         )))
         .add_resource(GhostModeTimer(Timer::new(
@@ -32,6 +34,7 @@ fn main() {
         .add_system(pacman_movement.system())
         .add_system(pacman_eating.system())
         .add_system(pacman_energy_boost.system())
+        .add_system(ghost_timer.system())
         .add_system(ghost_movement.system())
         .add_system(ghost_animate.system())
         .add_system(ghost_mode_timer.system())
@@ -88,14 +91,22 @@ impl Position {
     fn euclid_distance(self, x:i32, y:i32) -> f32 {
         (((self.y-y).pow(2) + (self.x-x).pow(2)) as f32).sqrt()
     }
-    fn choose_next_tile(self, direction: Direction, target: Position) -> (Position, Direction){
+    fn choose_next_tile(self, direction: Direction, target_: Position) -> (Position, Direction){
   	let mut tile: Position = self;
 	let mut shortest: f32 = 99999.;
         let mut dir: Direction = direction;
+        let mut target = target_;
+
+        if WORLD_MAP[self.y as usize][self.x as usize] == 9 ||
+            WORLD_MAP[self.y as usize][self.x as usize] == 3{
+                target = Position{x: 13, y: 11};
+        }
+
         //up
         if self.y-1 > -1 && 
             direction != Direction::Down &&
-            WORLD_MAP[(self.y-1) as usize][self.x as usize] != 1 {
+            WORLD_MAP[(self.y-1) as usize][self.x as usize] != 1 &&
+            WORLD_MAP[(self.y-1) as usize][self.x as usize] != 5 {
             let distance = target.euclid_distance(self.x, self.y-1);
             if distance < shortest {
                 shortest = distance;
@@ -194,8 +205,8 @@ struct Pacman {
 
 struct Ghost {
     direction: Direction,
-    // last: Position,
     target: Position,
+    scatter_target: Position,
 }
 impl Ghost {
 }
@@ -209,6 +220,7 @@ struct Game{
 
 #[derive(PartialEq, Copy, Clone, Debug)]
 enum Mode {
+    // Start,
     Chase1,
     Chase2,
     Scatter,
@@ -227,9 +239,6 @@ impl Mode {
     }
 }
 
-// struct RedGhost {
-//     mode: Mode,
-// }
 
 fn setup(
     commands: &mut Commands,
@@ -287,27 +296,27 @@ fn setup(
                     .with(Position{x:i as i32, y:j as i32})
                     .with(Size::square(1.0));
             }
-            // TODO delete
-            let mat4 = materials.add(Color::rgb(0.6, 0.2, 1.0).into());
-            let mat5 = materials.add(Color::rgb(0.2, 1.0, 0.6).into());
-            if WORLD_MAP[j][i] == 4 {
-                commands
-                    .spawn(SpriteBundle {
-                        material: mat4.clone(),
-                        ..Default::default()
-                    })
-                    .with(Position{x:i as i32, y:j as i32})
-                    .with(Size::square(1.0));
-            } else if WORLD_MAP[j][i] == 5 {
-                commands
-                    .spawn(SpriteBundle {
-                        material: mat5.clone(),
-                        ..Default::default()
-                    })
-                    .with(Position{x:i as i32, y:j as i32})
-                    .with(Size::square(1.0));
-            }
-            // TODO delete
+            // // TODO delete
+            // let mat4 = materials.add(Color::rgb(0.6, 0.2, 1.0).into());
+            // let mat5 = materials.add(Color::rgb(0.2, 1.0, 0.6).into());
+            // if WORLD_MAP[j][i] == 4 {
+            //     commands
+            //         .spawn(SpriteBundle {
+            //             material: mat4.clone(),
+            //             ..Default::default()
+            //         })
+            //         .with(Position{x:i as i32, y:j as i32})
+            //         .with(Size::square(1.0));
+            // } else if WORLD_MAP[j][i] == 5 {
+            //     commands
+            //         .spawn(SpriteBundle {
+            //             material: mat5.clone(),
+            //             ..Default::default()
+            //         })
+            //         .with(Position{x:i as i32, y:j as i32})
+            //         .with(Size::square(1.0));
+            // }
+            // // TODO delete
         }
     }
 
@@ -317,7 +326,6 @@ fn setup(
     commands
         .spawn(SpriteSheetBundle {
             texture_atlas: texture_atlas_handle,
-            // transform: Transform::from_rotation(Quat::from_rotation_y(90 as f32)),
             ..Default::default()
         })
         .with(Pacman{direction:Direction::Right, last: Position{x:13 as i32, y:23 as i32}})
@@ -345,9 +353,9 @@ fn ghost_setup(
     commands
         .spawn(SpriteSheetBundle {
             texture_atlas: pink_atlas_handle,
-            // transform: Transform::from_rotation(Quat::from_rotation_y(90 as f32)),
             ..Default::default()
         })
+        .with(Ghost{direction: Direction::Up, target: Position{x:25, y:1}, scatter_target: Position{x:25, y:1}})
         .with(Position{x:13 as i32, y:14 as i32})
         .with(Size::square(1.0));
 
@@ -357,9 +365,9 @@ fn ghost_setup(
     commands
         .spawn(SpriteSheetBundle {
             texture_atlas: blue_atlas_handle,
-            // transform: Transform::from_rotation(Quat::from_rotation_y(90 as f32)),
             ..Default::default()
         })
+        .with(Ghost{direction: Direction::Down, target: Position{x:1, y:29}, scatter_target: Position{x:1, y:29}})
         .with(Position{x:12 as i32, y:14 as i32})
         .with(Size::square(1.0));
 
@@ -369,9 +377,9 @@ fn ghost_setup(
     commands
         .spawn(SpriteSheetBundle {
             texture_atlas: orange_atlas_handle,
-            // transform: Transform::from_rotation(Quat::from_rotation_y(90 as f32)),
             ..Default::default()
         })
+        .with(Ghost{direction: Direction::Down, target: Position{x:25, y:29}, scatter_target: Position{x:25, y:29}})
         .with(Position{x:14 as i32, y:14 as i32})
         .with(Size::square(1.0));
 
@@ -381,18 +389,11 @@ fn ghost_setup(
     commands
         .spawn(SpriteSheetBundle {
             texture_atlas: red_atlas_handle,
-            // transform: Transform::from_rotation(Quat::from_rotation_y(90 as f32)),
             ..Default::default()
         })
-        // .with(Ghost{direction: Direction::Left, target: Position{x:1, y:1}, last: (Position{x:13, y:11}))
-        .with(Ghost{direction: Direction::Left, target: Position{x:1, y:1}}) //, last: (Position{x:13, y:11}))
+        .with(Ghost{direction: Direction::Left, target: Position{x:1, y:1}, scatter_target: Position{x:1, y:1}})
         .with(Position{x:13, y:11})
         .with(Size::square(1.0));
-
-        // .with(Pacman{direction:Direction::Right, last: Position{x:13 as i32, y:23 as i32}})
-        // .with(Position{x:13 as i32, y:23 as i32})
-        // .with(Size::square(1.0))
-        // .with(Timer::from_seconds(0.1, true));
 }
 
 fn translation(x: i32, y: i32) -> (i32, i32) {
@@ -444,10 +445,18 @@ fn pacman_animate(
     }
 }
 
-struct SpriteMovementTimer(Timer);
+struct PacmanMovementTimer(Timer);
 fn sprite_timer(
     time: Res<Time>, 
-    mut sprite_timer: ResMut<SpriteMovementTimer>
+    mut sprite_timer: ResMut<PacmanMovementTimer>
+) {
+    sprite_timer.0.tick(time.delta_seconds());
+}
+
+struct GhostMovementTimer(Timer);
+fn ghost_timer(
+    time: Res<Time>, 
+    mut sprite_timer: ResMut<GhostMovementTimer>
 ) {
     sprite_timer.0.tick(time.delta_seconds());
 }
@@ -459,14 +468,6 @@ fn ghost_mode_timer(
 ) {
     ghost_mode_timer.0.tick(time.delta_seconds());
 }
-
-// use std::fmt;
-
-// impl fmt::Display for Mode {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//             write!(f, "{:?}", self)
-//         }
-// }
 
 fn ghost_mode(
     mut game: ResMut<Game>,
@@ -496,7 +497,6 @@ fn pacman_eating(
 
 fn pacman_energy_boost(
     commands: &mut Commands,
-    // game: ResMut<Game>,
     foods: Query<(Entity, &Position), With<Energy>>,
     pacmans: Query<(Entity, &Pacman)>, 
 ){
@@ -504,7 +504,6 @@ fn pacman_energy_boost(
         for (ent, food_pos) in foods.iter() {
             if food_pos == &pacman.last {
                 commands.despawn(ent);
-                // game.mode = Mode::Scared;
             }
         }
     }
@@ -513,7 +512,7 @@ fn pacman_energy_boost(
 
 fn pacman_movement(
     keyboard_input: Res<Input<KeyCode>>,
-    pacman_timer: ResMut<SpriteMovementTimer>,
+    pacman_timer: ResMut<PacmanMovementTimer>,
     mut pacmans: Query<(Entity, &mut Pacman)>,
     mut positions: Query<&mut Position>,
     mut sprites: Query<(&TextureAtlasSprite, &mut Transform)>
@@ -579,36 +578,36 @@ fn pacman_movement(
 
 fn ghost_next_target(
     game: ResMut<Game>,
-    mut ghost: Query<(Entity, &mut Ghost)>,
+    mut ghosts: Query<(Entity, &mut Ghost)>,
     pacmans: Query<(Entity, &Pacman)>,
-    pacman_timer: ResMut<SpriteMovementTimer>,
+    ghost_timer: ResMut<GhostMovementTimer>,
     positions: Query<&Position>,
 ) {
-    if let Some((entity, mut ghost)) = ghost.iter_mut().next() {
+    for (entity, mut ghost) in ghosts.iter_mut() {
         let pos = positions.get(entity).unwrap();   
-        if !pacman_timer.0.finished() {
+        if !ghost_timer.0.finished() {
             return;
         }
         if game.mode == Mode::Scatter {
-            ghost.target = Position{x:1, y:1}
+            ghost.target = ghost.scatter_target; 
         }
-        if game.mode == Mode::Chase1 || game.mode == Mode::Chase2 {
+        else if game.mode == Mode::Chase1 || game.mode == Mode::Chase2 {
             if let Some((pacman_entity, _)) = pacmans.iter().next() {
                 ghost.target = *positions.get(pacman_entity).unwrap();
             }
-        }
+        } 
     }
 }
 
 fn ghost_movement(
-    pacman_timer: ResMut<SpriteMovementTimer>,
-    mut ghost: Query<(Entity, &mut Ghost)>,
+    ghost_timer: ResMut<GhostMovementTimer>,
+    mut ghosts: Query<(Entity, &mut Ghost)>,
     mut positions: Query<&mut Position>,
     mut sprites: Query<(&TextureAtlasSprite, &mut Transform)>
 ) {
-    if let Some((entity, mut ghost)) = ghost.iter_mut().next() {
-        let mut pos = positions.get_mut(entity).unwrap();   // when would i retrieve pacman like this vs querying directly in `sprites`?
-        if !pacman_timer.0.finished() {
+    for (entity, mut ghost) in ghosts.iter_mut() {
+        let mut pos = positions.get_mut(entity).unwrap();
+        if !ghost_timer.0.finished() {
             return;
         }
         let (next_tile, next_dir) = pos.choose_next_tile(ghost.direction, ghost.target);
@@ -639,4 +638,3 @@ fn ghost_animate(
         }
     }
 }
-
