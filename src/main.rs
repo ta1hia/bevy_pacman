@@ -484,9 +484,9 @@ fn ghost_mode(
 fn pacman_eating(
     commands: &mut Commands,
     foods: Query<(Entity, &Position), With<Food>>,
-    pacmans: Query<(Entity, &Pacman)>, 
+    pacmans: Query<&Pacman>, 
 ){
-    if let Some((entity, pacman)) = pacmans.iter().next() {
+    if let Some(pacman) = pacmans.iter().next() {
         for (ent, food_pos) in foods.iter() {
             if food_pos == &pacman.last {
                 commands.despawn(ent);
@@ -583,8 +583,8 @@ fn ghost_next_target(
     ghost_timer: ResMut<GhostMovementTimer>,
     positions: Query<&Position>,
 ) {
-    for (entity, mut ghost) in ghosts.iter_mut() {
-        let pos = positions.get(entity).unwrap();   
+    for (_entity, mut ghost) in ghosts.iter_mut() {
+        // let pos = positions.get(entity).unwrap();   
         if !ghost_timer.0.finished() {
             return;
         }
@@ -603,7 +603,6 @@ fn ghost_movement(
     ghost_timer: ResMut<GhostMovementTimer>,
     mut ghosts: Query<(Entity, &mut Ghost)>,
     mut positions: Query<&mut Position>,
-    mut sprites: Query<(&TextureAtlasSprite, &mut Transform)>
 ) {
     for (entity, mut ghost) in ghosts.iter_mut() {
         let mut pos = positions.get_mut(entity).unwrap();
