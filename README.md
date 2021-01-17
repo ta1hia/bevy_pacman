@@ -1,1 +1,1 @@
-tesing out bevy + rust + wasm
+tesing out bevy + wasm

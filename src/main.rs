@@ -324,7 +324,7 @@ fn ghost_setup(
         });
     
 
-    let pink_texture = asset_server.load("textures/pinkghost-sheet.png");
+    let pink_texture = asset_server.load("pinkghost-sheet.png");
     let pink_atlas = TextureAtlas::from_grid(pink_texture, Vec2::new(20.0, 20.0), 4, 1);
     let pink_atlas_handle = texture_atlases.add(pink_atlas);
     commands
@@ -336,7 +336,7 @@ fn ghost_setup(
         .with(Position{x:13 as i32, y:14 as i32})
         .with(Size::square(1.0));
 
-    let blue_texture = asset_server.load("textures/blueghost-sheet.png");
+    let blue_texture = asset_server.load("blueghost-sheet.png");
     let blue_atlas = TextureAtlas::from_grid(blue_texture, Vec2::new(20.0, 20.0), 4, 1);
     let blue_atlas_handle = texture_atlases.add(blue_atlas);
     commands
@@ -348,7 +348,7 @@ fn ghost_setup(
         .with(Position{x:12 as i32, y:14 as i32})
         .with(Size::square(1.0));
 
-    let orange_texture = asset_server.load("textures/orangeghost-sheet.png");
+    let orange_texture = asset_server.load("orangeghost-sheet.png");
     let orange_atlas = TextureAtlas::from_grid(orange_texture, Vec2::new(20.0, 20.0), 4, 1);
     let orange_atlas_handle = texture_atlases.add(orange_atlas);
     commands
@@ -360,7 +360,7 @@ fn ghost_setup(
         .with(Position{x:14 as i32, y:14 as i32})
         .with(Size::square(1.0));
 
-    let red_texture = asset_server.load("textures/redghost-sheet.png");
+    let red_texture = asset_server.load("redghost-sheet.png");
     let red_atlas = TextureAtlas::from_grid(red_texture, Vec2::new(20.0, 20.0), 4, 1);
     let red_atlas_handle = texture_atlases.add(red_atlas);
     commands

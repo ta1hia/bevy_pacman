@@ -36,10 +36,11 @@ command = "cargo"
 command = "${CARGO_TARGET_DIR}/${ENV_DIR}/${CARGO_MAKE_BINARY_EXECUTABLE_NAME}"
 dependencies = ["build-native"]
 
-# [tasks.serve]
-# command = "basic-http-server"
-# args = ["-x"]
-# dependencies = ["build-web", "basic-http-server"]
+[tasks.serve-basic-http]
+command = "basic-http-server"
+args = ["-x"]
+dependencies = ["build-web", "basic-http-server"]
+
 [tasks.serve]
 install_crate = {crate_name = "microserver", binary = "microserver", test_arg="--help"}
 env = { "RUST_LOG" = "basic_http_serve=trace" }
