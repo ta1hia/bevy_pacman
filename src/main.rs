@@ -1,17 +1,13 @@
-use bevy::prelude::*;
+use bevy::{
+    prelude::*,
+    log::{Level, LogSettings},
+};
 use std::time::Duration;
-
 use rand::seq::SliceRandom; 
 
-
 fn main() {
-    App::build()
-        .add_plugins(DefaultPlugins)
-        .add_resource(WindowDescriptor{  
-            title: "pacman".to_string(),
-            ..Default::default()  
-        })
-        .add_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
+    let mut app = App::build();
+    app.add_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
         .add_resource(PacmanMovementTimer(Timer::new(
                     Duration::from_millis(1. as u64),
                     true,
@@ -25,20 +21,27 @@ fn main() {
                     true,
         )))
         .add_resource(Game{mode:Mode::Scatter})
-        .add_startup_system(setup.system())
+        .add_plugins(DefaultPlugins);
+    #[cfg(target_arch = "wasm32")]
+    app.add_plugin(bevy_webgl2::WebGL2Plugin);
+    app.add_startup_system(setup.system())
         .add_startup_system(ghost_setup.system())
         .add_system(position_translation.system())
         .add_system(size_scaling.system())
+        .add_resource(LogSettings {
+            filter: "bevy_webgl2=warn".into(),
+            level: Level::INFO,
+        })
         .add_system(sprite_timer.system())
         .add_system(pacman_animate.system())
         .add_system(pacman_movement.system())
         .add_system(pacman_eating.system())
         .add_system(pacman_energy_boost.system())
         .add_system(ghost_timer.system())
-        .add_system(ghost_movement.system())
-        .add_system(ghost_animate.system())
         .add_system(ghost_mode_timer.system())
         .add_system(ghost_mode.system())
+        .add_system(ghost_movement.system())
+        .add_system(ghost_animate.system())
         .add_system(ghost_next_target.system())
         .run();
 }
@@ -46,8 +49,6 @@ fn main() {
 const ARENA_WIDTH: i32 = 27;
 const ARENA_HEIGHT: i32 = 31;
 
-// 4 for intersections
-// 5 for yellow/no up spots
 const WORLD_MAP: [[i32; 27]; 31] = [
   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
   [1, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 1],
@@ -197,7 +198,28 @@ impl Direction {
         }
     }
 }
+#[derive(PartialEq, Copy, Clone, Debug)]
+enum Mode {
+    Chase1,
+    Chase2,
+    Scatter,
+    // Scared,
+}
+impl Mode {
+    fn next(self) -> Self {
+        // let vs = vec![Self::Chase1, Self::Scatter];
+        match self {
+            Self::Chase1 => Self::Chase2,
+            Self::Chase2 => Self::Scatter,
+            _ => Self::Chase1,
+            // Self::Scared => *vs.choose(&mut rand::thread_rng()).unwrap(),
+        }
+    }
+}
 
+struct Game{
+    mode: Mode,
+}
 struct Pacman {
     direction: Direction,
     last: Position,
@@ -208,37 +230,8 @@ struct Ghost {
     target: Position,
     scatter_target: Position,
 }
-impl Ghost {
-}
-
 struct Food {}
 struct Energy {}
-
-struct Game{
-    mode: Mode,
-}
-
-#[derive(PartialEq, Copy, Clone, Debug)]
-enum Mode {
-    // Start,
-    Chase1,
-    Chase2,
-    Scatter,
-    Scared,
-}
-impl Mode {
-    fn next(self) -> Self {
-        let vs = vec![Self::Chase1, Self::Scatter];
-
-        match self {
-            Self::Chase1 => Self::Chase2,
-            Self::Chase2 => Self::Scatter,
-            Self::Scatter => Self::Chase1,
-            Self::Scared => *vs.choose(&mut rand::thread_rng()).unwrap(),
-        }
-    }
-}
-
 
 fn setup(
     commands: &mut Commands,
@@ -296,31 +289,9 @@ fn setup(
                     .with(Position{x:i as i32, y:j as i32})
                     .with(Size::square(1.0));
             }
-            // // TODO delete
-            // let mat4 = materials.add(Color::rgb(0.6, 0.2, 1.0).into());
-            // let mat5 = materials.add(Color::rgb(0.2, 1.0, 0.6).into());
-            // if WORLD_MAP[j][i] == 4 {
-            //     commands
-            //         .spawn(SpriteBundle {
-            //             material: mat4.clone(),
-            //             ..Default::default()
-            //         })
-            //         .with(Position{x:i as i32, y:j as i32})
-            //         .with(Size::square(1.0));
-            // } else if WORLD_MAP[j][i] == 5 {
-            //     commands
-            //         .spawn(SpriteBundle {
-            //             material: mat5.clone(),
-            //             ..Default::default()
-            //         })
-            //         .with(Position{x:i as i32, y:j as i32})
-            //         .with(Size::square(1.0));
-            // }
-            // // TODO delete
         }
     }
-
-    let texture_handle = asset_server.load("textures/pacman-sheet.png");
+    let texture_handle = asset_server.load("pacman-sheet.png");
     let texture_atlas = TextureAtlas::from_grid(texture_handle, Vec2::new(20.0, 20.0), 4, 1);
     let texture_atlas_handle = texture_atlases.add(texture_atlas);
     commands
@@ -333,6 +304,7 @@ fn setup(
         .with(Size::square(1.0))
         .with(Timer::from_seconds(0.1, true));
 }
+
 
 fn ghost_setup(
     commands: &mut Commands,
@@ -396,22 +368,22 @@ fn ghost_setup(
         .with(Size::square(1.0));
 }
 
-fn translation(x: i32, y: i32) -> (i32, i32) {
-    let (x2, y2): (i32, i32);
-    if x < ARENA_WIDTH/2  {
-        x2 = ((ARENA_WIDTH/2 - x ) * 20  + (20/2))  * -1
-    } else {
-        x2 = (x - ARENA_WIDTH/2) * 20  - (20/2)
-    }
-    if y < ARENA_HEIGHT/2  {
-        y2 = (ARENA_HEIGHT/2 - y ) * 20  + (20/2)
-    } else {
-        y2 = ((y - ARENA_HEIGHT/2) * 20  - (20/2)) * -1
-    }
-    (x2, y2)
-}
 
 fn position_translation(mut q: Query<(&Position, &mut Transform)>) {
+    fn translation(x: i32, y: i32) -> (i32, i32) {
+        let (x2, y2): (i32, i32);
+        if x < ARENA_WIDTH/2  {
+            x2 = ((ARENA_WIDTH/2 - x ) * 20  + (20/2))  * -1
+        } else {
+            x2 = (x - ARENA_WIDTH/2) * 20  - (20/2)
+        }
+        if y < ARENA_HEIGHT/2  {
+            y2 = (ARENA_HEIGHT/2 - y ) * 20  + (20/2)
+        } else {
+            y2 = ((y - ARENA_HEIGHT/2) * 20  - (20/2)) * -1
+        }
+        (x2, y2)
+    }
     for (pos, mut transform) in q.iter_mut() {
         let (x, y): (i32, i32) = translation(pos.x, pos.y);
         transform.translation = Vec3::new(
@@ -428,20 +400,6 @@ fn size_scaling(mut q: Query<(&Size, &mut Sprite)>) {
             20 as f32 *sprite_size.width ,
             20 as f32 *sprite_size.height ,
         );
-    }
-}
-
-fn pacman_animate(
-    time: Res<Time>,
-    texture_atlases: Res<Assets<TextureAtlas>>,
-    mut query: Query<(&Pacman, &mut Timer, &mut TextureAtlasSprite, &Handle<TextureAtlas>)>,
-) {
-    for (_, mut timer, mut sprite, texture_atlas_handle) in query.iter_mut() {
-        timer.tick(time.delta_seconds());
-        if timer.finished() {
-            let texture_atlas = texture_atlases.get(texture_atlas_handle).unwrap();
-            sprite.index = ((sprite.index as usize + 1) % texture_atlas.textures.len()) as u32;
-        }
     }
 }
 
@@ -468,18 +426,6 @@ fn ghost_mode_timer(
 ) {
     ghost_mode_timer.0.tick(time.delta_seconds());
 }
-
-fn ghost_mode(
-    mut game: ResMut<Game>,
-    ghost_mode_timer: ResMut<GhostModeTimer>,
-){
-    if !ghost_mode_timer.0.finished() {
-        return;
-    }
-    game.mode = game.mode.next();
-    println!("Mode is {:?}", game.mode);
-}
-
 
 fn pacman_eating(
     commands: &mut Commands,
@@ -575,27 +521,17 @@ fn pacman_movement(
     }
 }
 
-
-fn ghost_next_target(
-    game: ResMut<Game>,
-    mut ghosts: Query<(Entity, &mut Ghost)>,
-    pacmans: Query<(Entity, &Pacman)>,
-    ghost_timer: ResMut<GhostMovementTimer>,
-    positions: Query<&Position>,
+fn pacman_animate(
+    time: Res<Time>,
+    texture_atlases: Res<Assets<TextureAtlas>>,
+    mut query: Query<(&Pacman, &mut Timer, &mut TextureAtlasSprite, &Handle<TextureAtlas>)>,
 ) {
-    for (_entity, mut ghost) in ghosts.iter_mut() {
-        // let pos = positions.get(entity).unwrap();   
-        if !ghost_timer.0.finished() {
-            return;
+    for (_, mut timer, mut sprite, texture_atlas_handle) in query.iter_mut() {
+        timer.tick(time.delta_seconds());
+        if timer.finished() {
+            let texture_atlas = texture_atlases.get(texture_atlas_handle).unwrap();
+            sprite.index = ((sprite.index as usize + 1) % texture_atlas.textures.len()) as u32;
         }
-        if game.mode == Mode::Scatter {
-            ghost.target = ghost.scatter_target; 
-        }
-        else if game.mode == Mode::Chase1 || game.mode == Mode::Chase2 {
-            if let Some((pacman_entity, _)) = pacmans.iter().next() {
-                ghost.target = *positions.get(pacman_entity).unwrap();
-            }
-        } 
     }
 }
 
@@ -635,5 +571,38 @@ fn ghost_animate(
             Direction::Right => sprite.index = 2,
             Direction::Down => sprite.index = 3,
         }
+    }
+}
+
+fn ghost_mode(
+    mut game: ResMut<Game>,
+    ghost_mode_timer: ResMut<GhostModeTimer>,
+){
+    if !ghost_mode_timer.0.finished() {
+        return;
+    }
+    game.mode = game.mode.next();
+}
+
+
+fn ghost_next_target(
+    game: ResMut<Game>,
+    mut ghosts: Query<(Entity, &mut Ghost)>,
+    pacmans: Query<(Entity, &Pacman)>,
+    ghost_timer: ResMut<GhostMovementTimer>,
+    positions: Query<&Position>,
+) {
+    for (_entity, mut ghost) in ghosts.iter_mut() {
+        if !ghost_timer.0.finished() {
+            return;
+        }
+        if game.mode == Mode::Scatter {
+            ghost.target = ghost.scatter_target; 
+        }
+        else if game.mode == Mode::Chase1 || game.mode == Mode::Chase2 {
+            if let Some((pacman_entity, _)) = pacmans.iter().next() {
+                ghost.target = *positions.get(pacman_entity).unwrap();
+            }
+        } 
     }
 }

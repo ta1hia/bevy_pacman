@@ -1,37 +1,39 @@
-let
-  mozilla = import (builtins.fetchTarball https://github.com/mozilla/nixpkgs-mozilla/archive/master.tar.gz);
-  nixpkgs = import <nixpkgs> { overlays = [ mozilla ]; };
-in
+with import <nixpkgs> {
+  overlays = map (uri: import (fetchTarball uri)) [
+    https://github.com/mozilla/nixpkgs-mozilla/archive/master.tar.gz
+  ];
+};
 
-  with nixpkgs;
+stdenv.mkDerivation {
+  name = "rust-bevy-wasm";
+  buildInputs = [
+    cargo-web
+    (latest.rustChannels.stable.rust.override {
+      targets = ["wasm32-unknown-unknown"];
+    })
+    alsaLib
+    cmake
+    freetype
+    libudev
+    lutris
+    expat
+    openssl
+    pkgconfig
+    vulkan-headers
+    vulkan-loader
+    vulkan-tools
+    vulkan-validation-layers
+    xlibs.libX11
+  ];
+  APPEND_LIBRARY_PATH = stdenv.lib.makeLibraryPath [
+    vulkan-loader
+    xlibs.libXcursor
+    xlibs.libXi
+    xlibs.libXrandr
+  ];
 
-  mkShell {
-    buildInputs = [
-      alsaLib
-      cmake
-      freetype
-      latest.rustChannels.stable.rust
-      libudev
-      lutris
-      expat
-      openssl
-      pkgconfig
-      vulkan-headers
-      vulkan-loader
-      vulkan-tools
-      vulkan-validation-layers
-      xlibs.libX11
-    ];
-
-    APPEND_LIBRARY_PATH = stdenv.lib.makeLibraryPath [
-      vulkan-loader
-      xlibs.libXcursor
-      xlibs.libXi
-      xlibs.libXrandr
-    ];
-
-    shellHook = ''
-      export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$APPEND_LIBRARY_PATH"
-      export RUSTFLAGS="-C target-cpu=native"
-    '';
-  }
+  shellHook = ''
+    export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$APPEND_LIBRARY_PATH"
+    export RUSTFLAGS="-C target-cpu=native"
+  '';
+}
