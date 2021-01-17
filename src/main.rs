@@ -1,6 +1,9 @@
 use bevy::{
     prelude::*,
     log::{Level, LogSettings},
+    input::{
+        keyboard::KeyboardInput,
+    },
 };
 use std::time::Duration;
 use rand::seq::SliceRandom; 
@@ -13,7 +16,7 @@ fn main() {
                     true,
         )))
         .add_resource(GhostMovementTimer(Timer::new(
-                    Duration::from_millis(100. as u64),
+                    Duration::from_millis(150. as u64),
                     true,
         )))
         .add_resource(GhostModeTimer(Timer::new(
@@ -83,6 +86,7 @@ const WORLD_MAP: [[i32; 27]; 31] = [
   [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
 ];
 
+
 #[derive(Default, Copy, Clone, Eq, PartialEq, Hash)] 
 struct Position {
     x: i32,
@@ -129,7 +133,8 @@ impl Position {
         //down
         if self.y+1 < ARENA_HEIGHT && 
             direction != Direction::Up &&
-            WORLD_MAP[(self.y+1) as usize][self.x as usize] != 1 {
+            WORLD_MAP[(self.y+1) as usize][self.x as usize] != 1 &&
+            WORLD_MAP[(self.y+1) as usize][self.x as usize] != 3 {
             let distance = target.euclid_distance(self.x, self.y+1);
             if distance < shortest {
                 shortest = distance;
