@@ -1,6 +1,7 @@
 use bevy::{
     prelude::*,
     log::{Level, LogSettings},
+    asset::{AssetServerSettings},
     input::{
         keyboard::KeyboardInput,
     },
@@ -11,6 +12,9 @@ use rand::seq::SliceRandom;
 fn main() {
     let mut app = App::build();
     app.add_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
+        .add_resource(AssetServerSettings {
+            asset_folder: "/assets".to_string(),
+        })
         .add_resource(PacmanMovementTimer(Timer::new(
                     Duration::from_millis(1. as u64),
                     true,
